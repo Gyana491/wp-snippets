@@ -1,0 +1,38 @@
+<?php
+// Get all products
+    $args = array(
+        'post_type' => 'product',
+        'posts_per_page' => -1, // Get all products
+    );
+    
+    $products = get_posts($args);
+
+    foreach ($products as $product) {
+        // Get the model slug from the product
+        $model_slug = get_post_meta($product->ID, 'model_slug', true);
+            
+        if ($model_slug) {
+            // Find the post ID of the "car" post type that matches the model slug
+            $car_args = array(
+                'post_type' => 'car',
+                'meta_query' => array(
+                    array(
+                        'key' => 'model_slug',
+                        'value' => $model_slug,
+                        'compare' => '='
+                    )
+                ),
+                'posts_per_page' => 1,
+            );
+            
+            $cars = get_posts($car_args);
+
+            if (!empty($cars)) {
+                $car_id = $cars[0]->ID;
+                
+
+                // Update the product with the parent model ID
+                update_post_meta($product->ID, 'parent_model', $car_id);
+            }
+        }
+    }
