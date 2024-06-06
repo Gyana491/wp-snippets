@@ -1,0 +1,78 @@
+
+// Function to get product attributes
+function get_product_attributes( $product_id ) {
+    $product = wc_get_product( $product_id );
+    return $product->get_attributes();
+}
+
+// Function to merge product attributes
+function merge_product_attributes( $product_id_1, $product_id_2 ) {
+    $attributes_1 = get_product_attributes( $product_id_1 );
+    $attributes_2 = get_product_attributes( $product_id_2 );
+
+    $merged_attributes = [];
+
+    // Helper function to merge options and remove duplicates
+    function merge_options( $options1, $options2 ) {
+        $merged = array_merge( $options1, $options2 );
+        return array_unique( $merged );
+    }
+
+    // Helper function to convert term IDs to names
+    function convert_term_ids_to_names( $options, $taxonomy ) {
+        $names = [];
+        foreach ( $options as $option ) {
+            if ( term_exists( (int) $option, $taxonomy ) ) {
+                $term = get_term_by( 'id', (int) $option, $taxonomy );
+                if ( $term ) {
+                    $names[] = $term->name;
+                }
+            } else {
+                $names[] = $option;
+            }
+        }
+        return $names;
+    }
+
+    // Add attributes from the first product
+    foreach ( $attributes_1 as $attribute_1 ) {
+        $attribute_name = $attribute_1->get_name();
+        $options = $attribute_1->get_options();
+        $taxonomy = $attribute_1->is_taxonomy() ? $attribute_name : '';
+        if ( $taxonomy ) {
+            $options = convert_term_ids_to_names( $options, $taxonomy );
+        }
+        $merged_attributes[$attribute_name] = $options;
+    }
+
+    // Add attributes from the second product
+    foreach ( $attributes_2 as $attribute_2 ) {
+        $attribute_name = $attribute_2->get_name();
+        $options = $attribute_2->get_options();
+        $taxonomy = $attribute_2->is_taxonomy() ? $attribute_name : '';
+        if ( $taxonomy ) {
+            $options = convert_term_ids_to_names( $options, $taxonomy );
+        }
+        if ( isset( $merged_attributes[$attribute_name] ) ) {
+            $merged_attributes[$attribute_name] = merge_options( $merged_attributes[$attribute_name], $options );
+        } else {
+            $merged_attributes[$attribute_name] = $options;
+        }
+    }
+
+    return $merged_attributes;
+}
+
+// Example usage
+$product_id_1 = 1908; // Replace with the actual product ID
+$product_id_2 = 2286; // Replace with the actual product ID
+
+$merged_attributes = merge_product_attributes( $product_id_1, $product_id_2 );
+
+// Display the merged attributes
+foreach ( $merged_attributes as $attribute_name => $options ) {
+    $label = wc_attribute_label( $attribute_name );
+    echo 'Attribute Name: ' . $attribute_name . '<br>';
+    echo 'Attribute Label: ' . $label . '<br>';
+    echo 'Options: ' . implode( ', ', $options ) . '<br>';
+}
