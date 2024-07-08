@@ -1,0 +1,48 @@
+<?php
+function camel_case_replace_spaces($string) {
+    // Convert string to lowercase, then capitalize each word
+    $str = ucwords(str_replace(['-', '_'], ' ', strtolower($string)));
+    // Remove spaces
+    $str = str_replace(' ', '', $str);
+    // Make the first letter lowercase
+    $str = lcfirst($str);
+    // Replace remaining spaces with dashes
+    $str = str_replace(' ', '-', $str);
+    return $str;
+}
+
+function echo_custom_car_urls() {
+    // Query for 'car' post type
+    $args = array(
+        'post_type' => 'car',
+        'posts_per_page' => -1 // Get all posts
+    );
+
+    $query = new WP_Query($args);
+
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+
+            // Get the custom fields
+            $brand_name = get_post_meta(get_the_ID(), 'brand_name', true);
+            $variant_full_name = get_post_meta(get_the_ID(), 'variant_full_name', true);
+
+            // Convert to camel case and replace spaces with dashes
+            $brand_name_formatted = str_replace(' ', '-', $brand_name);
+            $variant_full_name_formatted = str_replace(' ', '-', $variant_full_name);
+
+            // Generate the URL
+            $url = "https://stimg.cardekho.com/images/feelthecar360view/Exterior/$brand_name_formatted/$variant_full_name_formatted/Exterior.html";
+
+            // Echo the URL
+            echo $url . "<br />";
+        }
+    } else {
+        echo 'No car posts found.';
+    }
+
+    // Restore original Post Data
+    wp_reset_postdata();
+}
+echo_custom_car_urls();
