@@ -1,5 +1,4 @@
 <?php
-
 function get_products_by_parent_model( $parent_model_value ) {
     // Define query arguments to get products with specific parent_model attribute
     $args = array(
@@ -43,6 +42,7 @@ function get_product_attribute_value( $product_id, $attribute_slug ) {
 
     // Get the attributes of the product
     $attributes = $product->get_attributes();
+    // print_r($attributes);
 
     // Initialize the array to store attribute values
     $attribute_values = array();
@@ -103,7 +103,7 @@ function get_unique_attribute_values_by_parent_model( $parent_model_value, $attr
     return $attribute_info;
 }
 
-function findRange($array, $suffix) {
+function findRange($array, $suffix, $decimal) {
     // Extract numeric values from the strings in the array
     $numericValues = array_map(function($value) {
         return floatval($value);
@@ -112,20 +112,23 @@ function findRange($array, $suffix) {
     // Find the minimum and maximum values
     $minValue = min($numericValues);
     $maxValue = max($numericValues);
-
+    
+    if(!isset( $decimal )){
+        $decimal= 2;
+    }
     // Format the output
-    $range = number_format($minValue, 2) . " - " . number_format($maxValue, 2) . $suffix;
+    $range = number_format($minValue, $decimal) . " - " . number_format($maxValue, $decimal) . $suffix;
 
     return $range;
 }
 
 // Usage example
 $parent_model_value = 3366; // Replace with your parent model value
-$attribute_slug = 'pa_mileage-arai'; // Replace with your attribute slug
+$attribute_slug = 'pa_engine-displacement'; // Replace with your attribute slug
 $unique_attribute_values_info = get_unique_attribute_values_by_parent_model( $parent_model_value, $attribute_slug );
 $values = $unique_attribute_values_info['attribute_values'];
 // print_r($values);
-//findRange($values, $suffix)
+//findRange($values, $suffix, $decimal)
 
-echo findRange($values, " kmpl");
+echo findRange($values, " cc", 0);
 
