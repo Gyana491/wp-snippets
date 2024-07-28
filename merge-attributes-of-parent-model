@@ -1,6 +1,7 @@
 // docs: https://chatgpt.com/c/49d98c06-f1bf-4e42-b922-abf39b1d531a
 
 <?php
+
 // Function to get products by parent model
 function get_products_by_parent_model($parent_model) {
     $args = array(
@@ -37,7 +38,7 @@ function get_product_attributes($product_id) {
     foreach ($attributes as $attribute) {
         // Get attribute label and slug
         $label = wc_attribute_label($attribute->get_name());
-        $slug = $attribute->get_name();
+        $slug = sanitize_title($attribute->get_name());
 
         // Get attribute values
         if ($attribute->is_taxonomy()) {
@@ -92,3 +93,4 @@ function merge_product_attributes_by_parent_model($parent_model) {
 // Example usage: Replace 3366 with your specific parent model ID
 $parent_model = 3366; // Replace with your parent model ID
 merge_product_attributes_by_parent_model($parent_model);
+
