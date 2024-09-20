@@ -1,0 +1,146 @@
+<?php
+
+/**
+ * Function: get_product_attributes_by_slug
+ *
+ * Description:
+ * This function retrieves all product attributes for a WooCommerce product based on its slug.
+ * It organizes the attributes by their respective attribute groups and also handles attributes
+ * that do not belong to any group by adding them to an "Additional Attributes" section.
+ * The function returns detailed information about each attribute, including:
+ * - Attribute Group ID
+ * - Attribute Group Name
+ * - Attribute Name
+ * - Attribute Slug
+ * - Attribute Values (as an array)
+ * - Count of Values
+ *
+ * Usage:
+ * - Pass the product slug (e.g., 'aston-martin-dbx-707') as the input parameter to the function.
+ * - The function will return a structured array with grouped and ungrouped attributes for the product.
+ *
+ * How it works:
+ * 1. It first retrieves the product ID using the product slug.
+ * 2. Fetches all the attributes of the product using WooCommerce's `wc_get_product()` and `get_attributes()`.
+ * 3. Fetches all the defined attribute groups from the custom post type 'attribute_group'.
+ * 4. Loops through each attribute and checks whether it belongs to any attribute group.
+ * 5. If an attribute is assigned to a group, it is added under that group's data.
+ * 6. Any attributes not assigned to a group are collected separately under the "Additional Attributes" section.
+ *
+ * Key Output Structure:
+ * - attribute_group_id: ID of the attribute group or 'additional' for ungrouped attributes.
+ * - attribute_group: Name of the attribute group or 'Additional Attributes' for ungrouped.
+ * - attributes: Array containing individual attribute details:
+ *     - attribute_id: ID of the attribute.
+ *     - attribute_name: Name of the attribute.
+ *     - attribute_slug: Slug of the attribute.
+ *     - attribute_values: Array of terms/values for the attribute.
+ *     - count: Number of values the attribute has.
+ *
+ * Example:
+ * $slug = 'aston-martin-dbx-707';
+ * $attributes = get_product_attributes_by_slug($slug);
+ * print_r($attributes);
+ *
+ * Note:
+ * Ensure that the WooCommerce plugin and 'attribute_group' custom post type are properly set up
+ * for this function to work correctly.
+ */
+
+function get_product_attributes_by_slug($slug) {
+    // Get the product ID by the slug
+    $product_id = get_page_by_path($slug, '', 'product');
+    if (!$product_id) {
+        return 'Product not found';
+    }
+
+    $product_id = $product_id->ID;
+    $product = wc_get_product($product_id);
+
+    // Get product attributes
+    $attributes = $product->get_attributes();
+
+    // Get attribute groups
+    $args = array(
+        'posts_per_page' => -1, 
+        'post_type' => 'attribute_group', 
+        'post_status' => 'publish', 
+        'orderby' => 'menu_order', 
+        'suppress_filters' => 0
+    );
+    
+    $attribute_groups = get_posts($args);
+    $attribute_data = [];
+    $additional_attributes = []; // For ungrouped attributes
+
+    // Initialize groups
+    foreach ($attribute_groups as $attribute_group) {
+        $attribute_data[] = [
+            'attribute_group_id' => $attribute_group->ID,
+            'attribute_group' => $attribute_group->post_title,
+            'attributes' => []
+        ];
+    }
+
+    // Add attributes to their respective groups
+    foreach ($attributes as $attribute_slug => $attribute) {
+        // Get the terms (values) for the attribute
+        $terms = wc_get_product_terms($product_id, $attribute_slug, ['fields' => 'all']);
+        $values = [];
+        foreach ($terms as $term) {
+            $values[] = $term->name;
+        }
+
+        // Get the attribute object to retrieve the correct name
+        $attribute_obj = wc_get_attribute($attribute->get_id());
+        $attribute_name = $attribute_obj->name;
+
+        // Determine if the attribute belongs to any group
+        $grouped = false;
+        foreach ($attribute_groups as $index => $attribute_group) {
+            $attributes_in_group = get_post_meta($attribute_group->ID, 'woocommerce_group_attributes_attributes');
+            $attributes_in_group = array_values($attributes_in_group[0]);
+
+            if (in_array($attribute->get_id(), $attributes_in_group)) {
+                $attribute_data[$index]['attributes'][] = [
+                    'attribute_id' => $attribute->get_id(),
+                    'attribute_name' => $attribute_name, // Correct name here
+                    'attribute_slug' => $attribute_slug,
+                    'attribute_values' => $values,
+                    'count' => count($values),
+                ];
+                $grouped = true;
+                break;
+            }
+        }
+
+        // If not grouped, add to additional attributes
+        if (!$grouped) {
+            $additional_attributes[] = [
+                'attribute_id' => $attribute->get_id(),
+                'attribute_name' => $attribute_name, // Correct name here
+                'attribute_slug' => $attribute_slug,
+                'attribute_values' => $values,
+                'count' => count($values),
+                'attribute_group_id' => null,
+            ];
+        }
+    }
+
+    // Add additional attributes to the main data structure
+    if (!empty($additional_attributes)) {
+        $attribute_data[] = [
+            'attribute_group_id' => 'additional',
+            'attribute_group' => 'Additional Attributes',
+            'attributes' => $additional_attributes
+        ];
+    }
+
+    return $attribute_data;
+}
+
+// Usage example
+$slug = 'aston-martin-dbx-707'; 
+$attributes = get_product_attributes_by_slug($slug);
+print_r($attributes);
+?>
