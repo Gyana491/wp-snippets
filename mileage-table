@@ -1,0 +1,153 @@
+// Reference: https://chatgpt.com/c/6705363d-3df8-8006-83de-09df56e45f17
+$model = "exter"; // Model to filter products by
+$args = array(
+    'post_type'      => 'product', // Assuming your products are of type 'product'
+    'posts_per_page' => -1,        // Retrieve all products
+    'tax_query'      => array(
+        array(
+            'taxonomy' => 'model', // Specify the taxonomy
+            'field'    => 'name',  // Field type (slug, term_id, name)
+            'terms'    => $model,  // The term you want to filter by
+        ),
+    ),
+);
+
+// The Query
+$products_query = new WP_Query($args);
+$mileage_by_fuel = []; // Initialize an array to hold mileage by fuel type and transmission
+$unique_combinations = []; // To track unique fuel type and transmission combinations
+$has_electric = false; // Track if there is an electric fuel type
+$min_mileage = null; // Minimum mileage for range in description
+$max_mileage = null; // Maximum mileage for range in description
+$existing_description = ""; // Placeholder for existing description
+
+// The Loop
+if ($products_query->have_posts()) {
+    while ($products_query->have_posts()) {
+        $products_query->the_post();
+        $product_id = get_the_ID(); // Use get_the_ID() with the correct casing
+
+        // Get the existing description of the product
+        $existing_description = get_post_field('post_content', $product_id);
+
+        // Get terms for the product in the 'pa_fuel-type', 'pa_mileage-arai', 'pa_transmission', and 'pa_range' taxonomies
+        $fuel_types = get_the_terms($product_id, "pa_fuel-type");
+        $mileages = get_the_terms($product_id, "pa_mileage-arai");
+        $transmissions = get_the_terms($product_id, "pa_transmission");
+        $ranges = get_the_terms($product_id, "pa_range"); // Get the range if available
+
+        // Check if fuel types, mileages, and transmissions are available
+        if ($fuel_types && !is_wp_error($fuel_types) && $transmissions && !is_wp_error($transmissions)) {
+            foreach ($fuel_types as $fuel) {
+                // Initialize variables
+                $mileage = null;
+                $range = null;
+
+                // Check if the fuel type is electric
+                if ($fuel->name === 'Electric') {
+                    $has_electric = true; // Set flag if electric is found
+                    // Get the range term
+                    if ($ranges && !is_wp_error($ranges)) {
+                        $range = $ranges[0]->name; // Assuming only one range term per product
+                    }
+                } else {
+                    // Get the mileage term if not electric
+                    if ($mileages && !is_wp_error($mileages)) {
+                        $mileage = floatval($mileages[0]->name); // Assuming only one mileage term per product
+                    }
+                }
+
+                // Get transmission info
+                if ($transmissions && !is_wp_error($transmissions)) {
+                    $transmission = $transmissions[0]->name; // Assuming only one transmission term per product
+                }
+
+                // Create a unique key for fuel type and transmission to avoid duplicates
+                $unique_key = $fuel->name . '-' . $transmission;
+
+                // If it's a unique combination, add it to the mileage_by_fuel array
+                if (!isset($unique_combinations[$unique_key])) {
+                    // Track the min and max mileage for the description
+                    if ($mileage) {
+                        if ($min_mileage === null || $mileage < $min_mileage) {
+                            $min_mileage = $mileage;
+                        }
+                        if ($max_mileage === null || $mileage > $max_mileage) {
+                            $max_mileage = $mileage;
+                        }
+                    }
+
+                    // Organize the data into an associative array
+                    $mileage_by_fuel[$fuel->name][$transmission] = $mileage;
+
+                    // Mark this combination as used
+                    $unique_combinations[$unique_key] = true;
+                }
+            }
+        }
+    }
+
+    // Start building the table
+    echo '<h2>' . ucfirst($model) . ' Fuel Efficiency Details</h2>';
+    echo '<table border="1" cellpadding="5" cellspacing="0">';
+    echo '<tr><th>Fuel Type</th>';
+    echo '<th>Transmission</th>'; // Common column for Transmission
+
+    // Check if the model has an electric variant to decide table columns
+    if ($has_electric) {
+        echo '<th>Range</th>';
+    } else {
+        echo '<th>Mileage</th>';
+    }
+    echo("</tr>");
+
+    // Loop through and populate table rows
+    foreach ($mileage_by_fuel as $fuel => $transmissions) {
+        foreach ($transmissions as $transmission => $mileage) {
+            echo '<tr>';
+            echo '<td>' . $fuel . '</td>';
+            echo '<td>' . $transmission . '</td>';
+
+            // Display range if it's an electric variant, otherwise display mileage
+            if ($has_electric && $fuel === 'Electric') {
+                echo '<td>' . ($range ? $range : 'N/A') . '</td>';
+            } else {
+                echo '<td>' . ($mileage ? $mileage . ' kmpl' : 'N/A') . '</td>';
+            }
+
+            echo '</tr>';
+        }
+    }
+
+    echo '</table>';
+
+    // Generate a dynamic description for SEO
+    $description = ucfirst($model) . " mileage is " . ($min_mileage ? $min_mileage : 'N/A') . " to " . ($max_mileage ? $max_mileage : 'N/A') . " kmpl. ";
+
+    // Add specific mileage details for each variant
+    $variant_mileage_details = [];
+    foreach ($mileage_by_fuel as $fuel => $transmissions) {
+        foreach ($transmissions as $transmission => $mileage) {
+            if ($mileage) {
+                $variant_mileage_details[] = "The " . ucfirst($transmission) . " " . ucfirst($fuel) . " variant has a mileage of " . $mileage . " kmpl.";
+            }
+        }
+    }
+
+    // Append variant mileage details to the description
+    if (!empty($variant_mileage_details)) {
+        $description .= implode(" ", $variant_mileage_details);
+    }
+
+    // Append the mileage/range details to the existing description
+    $final_description = $existing_description . ' ' . $description;
+
+    echo '<p>' . $final_description . '</p>';
+    
+} else {
+    // No products found
+    echo 'No products found.';
+}
+
+// Reset post data
+wp_reset_postdata(); // Always reset post data after custom queries
